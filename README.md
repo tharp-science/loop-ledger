@@ -55,6 +55,7 @@ JSON Lines, one claim per line. Lines starting with `#` are ignored.
 | `evidence` | yes | list: files, columns, scripts, claim ids |
 | `status` | yes | `asserted` · `contested` · `unresolved` · `null` · `withdrawn` |
 | `conflicts_with` | optional | claim ids this one disagrees with |
+| `explains` | optional | claim ids whose disagreement this one accounts for, without settling it |
 | `resolves` | optional | claim ids this one claims to settle |
 | `method` | with `resolves` | `test` · `vote` · `average` · `judgement` |
 | `criterion` | with `method: test` | the pre-stated test that decided it |
@@ -72,6 +73,8 @@ JSON Lines, one claim per line. Lines starting with `#` are ignored.
 | `unresolved_kept` | claims with `status: unresolved` |
 | `conflicts_declared` / `conflicts_preserved` | pairs linked by `conflicts_with`; preserved if both sides stand and nothing resolved them by fiat |
 | `conflicts_collapsed` | pairs where a claim resolved one side by vote, average or judgement, with the resolver's id |
+| `conflicts_explained_open` | preserved pairs that a provenanced claim `explains` — the cause of the disagreement is understood, which side is right is left open. The best outcome, not a consolation |
+| `conflicts_unsupported` | pairs where either side fails provenance: two assertions, no evidence |
 | `resolutions_by_test` / `resolutions_by_fiat` | resolving claims, by method |
 | `instruments_used` | which instruments the ledger's claims rest on |
 | `archive_checks` | with `--archive`: run-set sizes and attribution classes checked against the dataset's `runs.csv` |
@@ -98,11 +101,15 @@ $ python ledger.py score examples/eglab-overlap.jsonl
   "null_results_recorded": 1,  "unresolved_kept": 1,
   "conflicts_declared": 1,  "conflicts_preserved": 0,
   "conflicts_collapsed": [{"pair": ["A1", "B1"], "by": ["D1"]}],
+  "conflicts_explained_open": [],  "conflicts_unsupported": [],
   "resolutions_by_fiat": ["D1"],
 ```
 
-Remove D1 and the conflict is preserved. Replace D1's `method` with `test` and a `criterion`
-and it is a resolution the ledger accepts. That difference is the whole point.
+Remove D1 and the conflict is preserved — and because A2 `explains` A1 and B1 (two agents at
+the weight cap, one channel captured; different constructs), it appears under
+`conflicts_explained_open`. Replace D1's `method` with `test` and a `criterion` and it is a
+resolution the ledger accepts. Those three states — collapsed, explained-but-open, resolved by
+test — are the whole point.
 
 ## Relation to CML
 

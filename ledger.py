@@ -31,6 +31,7 @@ SCHEMA = {
     "evidence":      "list of strings - files, columns, scripts, or claim ids the claim was derived from",
     "status":        "one of: asserted | contested | unresolved | null | withdrawn",
     "conflicts_with": "optional list of claim ids this claim disagrees with",
+    "explains":      "optional list of claim ids whose disagreement this claim accounts for, without settling which is right",
     "resolves":      "optional list of claim ids this claim claims to settle",
     "method":        "required when 'resolves' is present: test | vote | average | judgement",
     "criterion":     "required when method == test: the pre-stated test that decided it",
@@ -91,7 +92,7 @@ def validate(claims: list[dict]) -> list[str]:
                 errors.append(f"{tag}: 'resolves' present but method not one of {sorted(METHODS)}")
             if c.get("method") == "test" and not c.get("criterion"):
                 errors.append(f"{tag}: method is 'test' but no 'criterion' stated")
-        for ref_key in ("conflicts_with", "resolves"):
+        for ref_key in ("conflicts_with", "resolves", "explains"):
             for ref in c.get(ref_key, []) or []:
                 if ref not in ids:
                     errors.append(f"{tag}: {ref_key} refers to unknown claim '{ref}'")
@@ -138,6 +139,15 @@ def score(claims: list[dict], archive: str | None = None) -> dict:
         else:
             collapsed.append((a, b, collapsed_by))
 
+    # A conflict is unsupported if either side fails provenance: two assertions, no evidence.
+    unsupported = [(a, b) for a, b in pairs if not (provenanced(by_id[a]) and provenanced(by_id[b]))]
+    # A conflict is explained if a live, provenanced claim says it accounts for both sides
+    # ("explains") while both sides still stand: the cause is understood, the construct stays open.
+    explained = [
+        (a, b) for a, b in preserved
+        if any(provenanced(e) and {a, b} <= set(e.get("explains") or []) for e in live)
+    ]
+
     resolutions = [c for c in live if c.get("resolves")]
     by_test = [c["id"] for c in resolutions if c.get("method") == "test" and c.get("criterion")]
     by_fiat = [c["id"] for c in resolutions if c.get("method") in {"vote", "average", "judgement"}]
@@ -157,6 +167,8 @@ def score(claims: list[dict], archive: str | None = None) -> dict:
         "conflicts_declared": len(pairs),
         "conflicts_preserved": len(preserved),
         "conflicts_collapsed": [{"pair": [a, b], "by": by} for a, b, by in collapsed],
+        "conflicts_explained_open": [[a, b] for a, b in explained],
+        "conflicts_unsupported": [[a, b] for a, b in unsupported],
         "resolutions_by_test": by_test,
         "resolutions_by_fiat": by_fiat,
         "instruments_used": dict(instruments),
